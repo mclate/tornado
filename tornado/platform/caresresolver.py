@@ -22,6 +22,19 @@ class CaresResolver(Resolver):
     .. versionchanged:: 4.1
        The ``io_loop`` argument is deprecated.
     """
+    RTYPES = {
+        'A': pycares.QUERY_TYPE_A,
+        'AAAA': pycares.QUERY_TYPE_AAAA,
+        'CNAME': pycares.QUERY_TYPE_CNAME,
+        'MX': pycares.QUERY_TYPE_MX,
+        'NAPTR': pycares.QUERY_TYPE_NAPTR,
+        'NS': pycares.QUERY_TYPE_NS,
+        'PTR': pycares.QUERY_TYPE_PTR,
+        'SOA': pycares.QUERY_TYPE_SOA,
+        'SRV': pycares.QUERY_TYPE_SRV,
+        'TXT': pycares.QUERY_TYPE_TXT,
+    }
+
     def initialize(self, io_loop=None):
         self.io_loop = io_loop or IOLoop.current()
         self.channel = pycares.Channel(sock_state_cb=self._sock_state_cb)
@@ -77,3 +90,35 @@ class CaresResolver(Resolver):
                                 (family, address_family))
             addrinfo.append((address_family, (address, port)))
         raise gen.Return(addrinfo)
+
+    @gen.coroutine
+    def query(self, hostname, record_type):
+        """Query DNS server and return list of results (based on record type).
+
+        Accept ``hostname`` to resolve and ``record_type``.
+        Supported ``record_type`` values are (case-insensitive):
+
+        * A
+        * AAAA
+        * CNAME
+        * MX
+        * NAPTR
+        * NS
+        * PTR
+        * SOA
+        * SRV
+        * TXT
+
+        """
+        assert record_type.upper() in self.RTYPES, 'Incorrect record type'
+        query_type = self.RTYPES[record_type.upper()]
+
+        self.channel.query(hostname, query_type, (yield gen.Callback(1)))
+        callback_args = yield gen.Wait(1)
+        assert isinstance(callback_args, gen.Arguments)
+        assert not callback_args.kwargs
+        result, error = callback_args.args
+        if error:
+            raise Exception('C-Ares returned error %s: %s while resolving %s' %
+                            (error, pycares.errno.strerror(error), hostname))
+        raise gen.Return(result)

@@ -159,6 +159,21 @@ class CaresResolverTest(AsyncTestCase, _ResolverTestMixin):
         super(CaresResolverTest, self).setUp()
         self.resolver = CaresResolver(io_loop=self.io_loop)
 
+    @gen_test
+    def test_query(self):
+        """ Test CaresResolver query method. """
+        with self.assertRaises(AssertionError):
+            yield self.resolver.query('example.com', 'BAD_TYPE')
+
+        try:
+            res = yield self.resolver.query('localhost', 'A')
+            self.assertEqual(type(res), list)
+            self.assertIn('127.0.0.1', res)
+        except AssertionError, exc:
+            self.fail('Unexpected exception: %s' % exc)
+        except Exception, exc:
+            self.fail('Unexpected exception: %s' % exc)
+
 
 # TwistedResolver produces consistent errors in our test cases so we
 # can test the regular and error cases in the same class.
